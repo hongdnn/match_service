@@ -14,10 +14,10 @@ RUN yarn install
 COPY . .
 
 # Set an environment variable 
-ENV PORT=3000
+ENV PORT=4000
 
 # Expose the port that the app will run on
-EXPOSE 3000
+EXPOSE 4000
 
 # Tell docker what command will start the application
 CMD [ "yarn", "start" ]

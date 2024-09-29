@@ -3,6 +3,7 @@ import cors from 'cors'
 import { errors } from 'celebrate'
 import { orderRouter } from '../controllers/routes/order.route'
 import { transactionRouter } from '../controllers/routes/transaction.route'
+import { matchRouter } from '../controllers/routes/match.route'
 
 export class ExpressLoader {
     constructor() {}
@@ -13,6 +14,7 @@ export class ExpressLoader {
         
         app.use('/orders', orderRouter)
         app.use('/transactions', transactionRouter)
+        app.use('/matches', matchRouter)
 
         app.use(errors())
 
