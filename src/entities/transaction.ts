@@ -14,21 +14,7 @@ export class Transaction {
     transactionDate: string
     transactionAmount: number
     overall: number
-    ratio: number
-
-    constructor(dto: any){
-        this._id = dto._id
-        this.type = dto.type
-        this.customerName = dto.customerName
-        this.orderId = dto.orderId
-        this.date = dto.date
-        this.product = dto.product
-        this.price = dto.price
-        this.transactionType = dto.transactionType
-        this.transactionDate = dto.transactionDate
-        this.transactionAmount = dto.transactionAmount
-        this.overall = dto.overall
-    }
+    
 }
 
 const transactionSchema = new Schema({

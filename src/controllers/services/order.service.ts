@@ -3,6 +3,7 @@ import { TYPES } from "../../types";
 import { IOrderRepository } from "../../repositories/order.repository";
 import { Order } from "../../entities/order";
 import { Transaction } from "../../entities/transaction";
+import { IMatchRepository } from "../../repositories/match.repository";
 
 
 
@@ -17,6 +18,7 @@ export interface IOrderService {
 export class OrderService implements IOrderService {
 
     @inject(TYPES.IOrderRepository) private readonly _orderRepo: IOrderRepository
+    @inject(TYPES.IMatchRepository) private readonly _matchRepo: IMatchRepository
 
     public async getOrders(): Promise<{ data: Order[] }> {
         const orders = await this._orderRepo.getAll()
@@ -56,20 +58,24 @@ export class OrderService implements IOrderService {
     public async match(orders: Order[], transactions: Transaction[]): Promise<{ data: any; }> {
         const map = new Map()
 
+        const orderIds = orders.map(order => order._id)
+        const transactionIds = transactions.map(transaction => transaction._id)
+
+        const existedMatches = await this._matchRepo.findByCondition({
+            orderId: { $in: orderIds },
+            transactionId: { $in: transactionIds }
+        })
+
+        const matchesMap = new Map(
+            existedMatches.map(match => [`${match.orderId}-${match.transactionId}`, match.status])
+        );
+
         for (let order of orders) {
             for (let transaction of transactions) {
-                const customerNameRatio = this.compareTexts(order.customerName, transaction.customerName)
-                const orderIdRatio = this.compareTexts(order.orderId, transaction.orderId)
-                const productRatio = this.compareTexts(order.product, transaction.product)
-                if(customerNameRatio < 30 || orderIdRatio < 30 || productRatio < 30) continue
-                const overallRatio = Math.round((customerNameRatio + orderIdRatio + productRatio) / 3)
-                console.log('customerNameRatio: ', customerNameRatio)
-                console.log('orderIdRatio: ', orderIdRatio)
-                console.log('productRatio: ', productRatio)
-                console.log('overallRatio: ', overallRatio)
-                if (overallRatio >= 60) {
-                    let txn = { ...transaction }
-                    txn.ratio = overallRatio
+                // check if user confirmed/rejected this match
+                if (matchesMap.get(`${order._id}-${transaction._id}`) === 'rejected') continue
+                else if (matchesMap.get(`${order._id}-${transaction._id}`) === 'confirmed') {
+                    let txn = { ...transaction, status: 'confirmed' }
                     if (!map.get(order.orderId)) {
                         const array = [order, txn]
                         map.set(order.orderId, array)
@@ -77,6 +83,29 @@ export class OrderService implements IOrderService {
                         const array = map.get(order.orderId)
                         array.push(txn);
                         map.set(order.orderId, array)
+                    }
+                }
+                // else, compare texts of order information and transaction information
+                else {
+                    const customerNameRatio = this.compareTexts(order.customerName, transaction.customerName)
+                    const orderIdRatio = this.compareTexts(order.orderId, transaction.orderId)
+                    const productRatio = this.compareTexts(order.product, transaction.product)
+
+                    // if one of the data is too different, consider this order and transaction are not match
+                    if (customerNameRatio < 30 || orderIdRatio < 30 || productRatio < 30) continue
+                    const overallRatio = Math.round((customerNameRatio + orderIdRatio + productRatio) / 3)
+
+                    //assuming the overall ratio of same texts should be at least 60%
+                    if (overallRatio >= 60) {
+                        let txn = { ...transaction, ratio: overallRatio }
+                        if (!map.get(order.orderId)) {
+                            const array = [order, txn]
+                            map.set(order.orderId, array)
+                        } else {
+                            const array = map.get(order.orderId)
+                            array.push(txn);
+                            map.set(order.orderId, array)
+                        }
                     }
                 }
             }
@@ -90,7 +119,7 @@ export class OrderService implements IOrderService {
         if (text1 === text2) return 100
         let l1 = text1.length
         let l2 = text2.length
-        
+
         // when compare array of words, remove the number of spaces in the strings
         let words1 = text1.split(' ')
         l1 -= words1.length - 1
@@ -146,7 +175,7 @@ export class OrderService implements IOrderService {
         }
         let result = Math.round(matchCharCount / maxLength * 100)
         // 95% means the order of words inside 2 strings are not the same
-        if(result === 100) result -= 5
+        if (result === 100) result -= 5
         return result
     }
 }
